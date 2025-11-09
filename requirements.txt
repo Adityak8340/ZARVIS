@@ -1,0 +1,15 @@
+# ZARVIS Core Dependencies
+
+# Groq API for LLM, Vision, TTS, and STT
+groq==0.33.0
+
+# Environment variable management
+python-dotenv==1.2.1
+
+# Additional dependencies for future features
+PyQt6==6.10.0  # For GUI (uncomment when implementing frontend)
+pillow==12.0.0  # For image processing
+pyaudio==0.2.14  # For real-time audio capture
+sounddevice==0.5.3  # For audio recording
+soundfile==0.13.1  # For saving audio files
+opencv-python>=4.12.0.18  # For screen capture and vision
