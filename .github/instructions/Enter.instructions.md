@@ -6,6 +6,5 @@
     1. Generate code
     2. Run Pylance and linters
     3. Fix critical/high-priority issues
-    4. Run tests
-    5. Commit changes
+    4. Commit changes
 - If you need help, include the exact Pylance error messages when requesting support.

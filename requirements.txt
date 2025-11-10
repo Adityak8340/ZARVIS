@@ -3,6 +3,11 @@
 # Groq API for LLM, Vision, TTS, and STT
 groq==0.33.0
 
+# LangGraph and LangChain for agent orchestration
+langgraph==1.0.2
+langchain-groq==1.0.0
+langchain==1.0.5
+
 # Environment variable management
 python-dotenv==1.2.1
 

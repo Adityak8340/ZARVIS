@@ -1,220 +1,759 @@
-# ZARVIS Code Structure
+# ZARVIS Architecture - LangGraph Agent System
 
-## Overview
-ZARVIS code has been refactored into a modular architecture with smaller, focused files (~150 lines each) for better maintainability and readability.
+## 🎯 Overview
 
-## Directory Structure
+ZARVIS (Zero-Latency Autonomous Runtime Virtual Intelligence System) is a **LangGraph-based agent orchestrator** that intelligently coordinates multimodal AI capabilities through tools. The system uses a **Brain agent** as the central orchestrator with **Ear, Eye, and Mouth** as LangGraph tools.
+
+---
+
+## 🏗️ Architecture Diagram
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                         ZARVIS                              │
+│                    (Main Controller)                        │
+└──────────────────────┬──────────────────────────────────────┘
+                       │
+                       ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   Brain Agent                               │
+│              (LangGraph Orchestrator)                       │
+│                                                             │
+│  ┌──────────────┐      ┌──────────────┐       ┌──────────┐  │
+│  │ Agent Node   │─────▶│ Tool Router  │─────▶│ Tools    │  │
+│  │ (Reasoning)  │◀─────│ (Decision)   │◀─────│ (Execute)│  │
+│  └──────────────┘      └──────────────┘       └──────────┘  │
+│         │                                           │       │
+│         └───────────────────┬───────────────────────┘       │
+│                             │                               │
+└─────────────────────────────┼───────────────────────────────┘
+                              │
+                 ┌────────────┴────────────┐
+                 │                         │
+                 ▼                         ▼
+       ┌─────────────────┐      ┌─────────────────┐
+       │  LangGraph Tools│      │   Tool Node     │
+       └─────────────────┘      └─────────────────┘
+                 │
+    ┌────────────┼────────────┐
+    │            │            │
+    ▼            ▼            ▼
+┌─────────┐  ┌─────────┐  ┌─────────┐
+│   Ear   │  │   Eye   │  │  Mouth  │
+│  Tool   │  │  Tool   │  │  Tool   │
+│ (Listen)│  │  (See)  │  │ (Speak) │
+└─────────┘  └─────────┘  └─────────┘
+     │            │            │
+     ▼            ▼            ▼
+┌─────────┐  ┌─────────┐  ┌─────────┐
+│ Groq    │  │ Groq    │  │ Groq    │
+│ Whisper │  │ Vision  │  │ PlayAI  │
+│  API    │  │  API    │  │  TTS    │
+└─────────┘  └─────────┘  └─────────┘
+```
+
+---
+
+## 📁 Project Structure
 
 ```
 ZARVIS/
-├── main.py                    # Main ZARVIS orchestrator (193 lines)
-├── gui_main.py                # GUI entry point (42 lines)
-├── requirements.txt
-├── README.md
-├── output/                    # Generated audio and recordings
+├── main.py                      # Main ZARVIS controller with agent integration
+├── gui_main.py                  # GUI entry point
+├── test_agent.py                # Agent testing script
+├── requirements.txt             # Dependencies (includes LangGraph)
+├── README.md                    # Project overview
+├── ARCHITECTURE.md              # This file
+├── ARCHITECTURE_LANGGRAPH.md    # Detailed LangGraph implementation
+├── MIGRATION.md                 # Migration guide from old architecture
+├── SUMMARY.md                   # Project summary and statistics
+├── AUDIO_CLEANUP.md             # Audio cleanup feature documentation
+├── output/                      # Generated audio and recordings (auto-cleaned)
 └── src/
     ├── __init__.py
-    ├── brain.py              # LLM processing (125 lines)
-    ├── ear.py                # Speech-to-text (72 lines)
-    ├── eye.py                # Vision processing (111 lines)
-    ├── mouth.py              # Text-to-speech (65 lines)
-    └── gui/                  # **NEW: Modular GUI Package**
-        ├── __init__.py       # GUI entry point (24 lines)
-        ├── threads.py        # Background threads (133 lines)
-        ├── styles.py         # Theming and colors (87 lines)
-        ├── chat_widget.py    # Chat interface (147 lines)
-        ├── settings_widget.py # Settings tab (43 lines)
-        ├── audio_handler.py  # Audio recording/playback (141 lines)
-        └── main_window.py    # Main window coordinator (190 lines)
+    ├── brain_agent.py           # 🧠 LangGraph Agent Orchestrator (NEW)
+    ├── brain_old.py             # 📦 Original brain module (backup)
+    ├── ear.py                   # 📦 Original ear module (backup)
+    ├── eye.py                   # 📦 Original eye module (backup)
+    ├── mouth.py                 # 📦 Original mouth module (backup)
+    ├── tools/                   # 🔧 LangGraph Tools Package (NEW)
+    │   ├── __init__.py
+    │   ├── ear_tool.py          # 👂 Speech-to-Text Tool
+    │   ├── eye_tool.py          # 👁️ Vision Analysis Tool
+    │   └── mouth_tool.py        # 🗣️ Text-to-Speech Tool
+    └── gui/                     # 💻 GUI Package
+        ├── __init__.py
+        ├── threads.py           # Background task threads
+        ├── styles.py            # Dark theme and styling
+        ├── chat_widget.py       # Chat interface component
+        ├── settings_widget.py   # Settings tab component
+        ├── audio_handler.py     # Audio recording/playback (with auto-cleanup)
+        └── main_window.py       # Main window coordinator
 ```
 
-## Module Responsibilities
+---
 
-### Core Modules (`src/`)
+## 🧠 Brain Agent (Orchestrator)
 
-#### `brain.py` (125 lines)
-- LLM text processing
-- Conversation memory management
-- Context handling
+**File:** `src/brain_agent.py`
 
-#### `ear.py` (72 lines)
-- Speech-to-text transcription
-- Audio file handling via Groq Whisper
+### Purpose
+The Brain is a **LangGraph-based intelligent orchestrator** that:
+1. Receives user input
+2. Decides which tools to use (Ear, Eye, Mouth)
+3. Executes tools as needed
+4. Generates final responses
 
-#### `eye.py` (111 lines)
-- Image analysis
-- Vision model integration
+### Key Components
 
-#### `mouth.py` (65 lines)
-- Text-to-speech synthesis
-- Audio file generation via Groq PlayAI
+#### 1. AgentState (TypedDict)
+```python
+class AgentState(TypedDict):
+    messages: Annotated[Sequence[BaseMessage], add_messages]
+    next: Optional[str]
+```
+- Manages conversation messages
+- Tracks execution flow
+- Uses LangChain message types
 
-### GUI Package (`src/gui/`)
+#### 2. StateGraph Architecture
+```python
+workflow = StateGraph(AgentState)
+workflow.add_node("agent", self._agent_node)      # Reasoning
+workflow.add_node("tools", ToolNode(self.tools))  # Tool execution
+workflow.set_entry_point("agent")
+workflow.add_conditional_edges("agent", self._should_continue, {...})
+workflow.add_edge("tools", "agent")
+```
 
-#### `__init__.py` (24 lines)
-- Package entry point
-- `launch_gui()` function
-- Exports main classes
+#### 3. Execution Flow
+```
+User Input → Agent Node → Decision
+                ↓
+         [Tool Call Needed?]
+           ↙         ↘
+         Yes          No
+          ↓            ↓
+      Tool Node    Response
+          ↓
+     Agent Node → Final Response
+```
 
-#### `threads.py` (133 lines)
-**Purpose:** Background task execution
-- `ProcessingThread` - Handles AI tasks (text, voice, vision, speech)
-- `AudioRecorder` - Records audio from microphone
-- Non-blocking UI operations
+### Methods
 
-#### `styles.py` (87 lines)
-**Purpose:** UI theming and styling
-- `DarkTheme` - Dark mode stylesheet
-- `Fonts` - Font configurations
-- Color constants for messages
+| Method | Purpose |
+|--------|---------|
+| `think(user_input, context)` | Process input through agent graph |
+| `stream_think(user_input, context)` | Stream agent's reasoning process |
+| `_agent_node(state)` | LLM reasoning with tool binding |
+| `_should_continue(state)` | Routing logic for tool calls |
 
-#### `chat_widget.py` (147 lines)
-**Purpose:** Chat interface component
+### System Prompt
+```
+You are ZARVIS, a Zero-Latency Autonomous Runtime Virtual Intelligence System.
+You are a local, OS-integrated AI assistant that can see, hear, and speak.
+
+You have access to these tools:
+- listen_tool: Convert audio files to text (speech-to-text)
+- see_tool: Analyze images and provide visual descriptions
+- speak_tool: Convert text to speech audio files
+
+Use these tools intelligently based on user requests.
+Be concise, helpful, and action-oriented.
+```
+
+---
+
+## 🔧 Tools Package
+
+### 1. Ear Tool (`src/tools/ear_tool.py`)
+
+**Purpose:** Speech-to-Text conversion
+
+```python
+@tool
+def listen_tool(audio_file_path: str, prompt: str = "Transcribe clearly") -> str:
+    """
+    Transcribe audio file to text using Groq Whisper.
+    
+    Use this tool when you need to convert speech/audio to text.
+    """
+    # Uses Groq Whisper Large V3
+    # Returns transcribed text
+```
+
+**Capabilities:**
+- Supports multiple audio formats (WAV, MP3, M4A, etc.)
+- Context-aware transcription with prompt guidance
+- Fast processing via Groq API
+- Error handling and logging
+
+**Usage:**
+```python
+# Agent automatically uses when it detects audio processing need
+result = brain.think("Transcribe the audio at 'recording.m4a'")
+```
+
+---
+
+### 2. Eye Tool (`src/tools/eye_tool.py`)
+
+**Purpose:** Vision and Image Analysis
+
+```python
+@tool
+def see_tool(image_url: str, prompt: str = "Describe what you see...") -> str:
+    """
+    Analyze an image and provide detailed observations using vision AI.
+    
+    Use this tool when you need to understand visual content.
+    """
+    # Uses Groq Vision (Llama 4 Scout)
+    # Returns detailed image analysis
+```
+
+**Capabilities:**
+- Analyzes images from URLs
+- Identifies objects, text, scenes
+- Provides detailed descriptions
+- Understands visual context
+
+**Usage:**
+```python
+# Agent automatically uses when it detects image analysis need
+result = brain.think("What's in the image at 'https://example.com/photo.jpg'?")
+```
+
+---
+
+### 3. Mouth Tool (`src/tools/mouth_tool.py`)
+
+**Purpose:** Text-to-Speech synthesis
+
+```python
+@tool
+def speak_tool(text: str, output_filename: str = "speech.wav", 
+               voice: str = "Aaliyah-PlayAI") -> str:
+    """
+    Convert text to speech and save as an audio file.
+    
+    Use this tool when you need to generate speech audio.
+    """
+    # Uses Groq PlayAI TTS
+    # Returns path to generated audio file
+```
+
+**Capabilities:**
+- Generates natural speech from text
+- Creates WAV audio files
+- Customizable voice selection
+- Saves to output directory
+
+**Usage:**
+```python
+# Agent automatically uses when speech generation is needed
+result = brain.think("Generate audio saying 'Hello World'")
+```
+
+---
+
+## 💻 GUI System
+
+### Architecture
+The GUI uses PyQt6 with a modular design pattern:
+
+```
+Main Window (Coordinator)
+    ├── Chat Widget (User Interface)
+    ├── Settings Widget (Configuration)
+    ├── Audio Handler Mixin (Voice I/O)
+    ├── Processing Threads (Background Tasks)
+    └── Media Player (Audio Playback)
+```
+
+### Key Components
+
+#### 1. Main Window (`src/gui/main_window.py`)
+- Application coordinator
+- Window setup and layout
+- Tab management
+- Event handling
+- Thread lifecycle management
+
+#### 2. Chat Widget (`src/gui/chat_widget.py`)
 - Text input/output
 - Microphone button
 - Image attachment button
 - Voice toggle
 - Message display with color coding
 
-#### `settings_widget.py` (43 lines)
-**Purpose:** Settings tab component
-- Model configuration display
-- Feature list
-- Clear memory button
-
-#### `audio_handler.py` (141 lines)
-**Purpose:** Audio functionality mixin
+#### 3. Audio Handler (`src/gui/audio_handler.py`)
 - Recording management
 - Audio playback
 - Speech generation
-- Media player error handling
+- **Automatic file cleanup** 🧹
 
-#### `main_window.py` (190 lines)
-**Purpose:** Application coordinator
-- Window setup and layout
-- Tab management
-- Event handling
-- Thread lifecycle management
-- Application cleanup
+#### 4. Processing Threads (`src/gui/threads.py`)
+- `ProcessingThread` - AI tasks (text, voice, vision, speech)
+- `AudioRecorder` - Microphone recording
+- Non-blocking UI operations
 
-## Benefits of Modular Structure
+#### 5. Styles (`src/gui/styles.py`)
+- Dark theme stylesheet
+- Color constants
+- Font configurations
 
-### 1. **Maintainability**
-- Each file has a single responsibility
-- Easy to locate specific functionality
-- Changes are isolated to relevant modules
+---
 
-### 2. **Readability**
-- Files are ~43-190 lines (avg ~120 lines)
-- Clear module boundaries
-- Self-documenting structure
+## 🧹 Audio Cleanup Feature
 
-### 3. **Testability**
-- Each module can be tested independently
-- Mocks and stubs are easier to create
-- Unit tests can target specific components
+**Implemented in:** `src/gui/audio_handler.py`
 
-### 4. **Scalability**
-- Easy to add new features
-- Can replace components without affecting others
-- Plugin architecture possible
+### Purpose
+Automatically delete temporary audio files during runtime to prevent disk space buildup.
 
-### 5. **Collaboration**
-- Multiple developers can work on different modules
-- Reduced merge conflicts
-- Clear code ownership
+### What Gets Cleaned Up
 
-## Key Design Patterns
+1. **Generated Speech Files** (from text-to-speech)
+   - Deleted 200ms after playback completes
+   - Example: `speech_123456.wav`
 
-### 1. **Separation of Concerns**
-- UI (widgets) separate from logic (handlers)
-- Threading separate from UI
-- Styling separate from functionality
+2. **Recorded Voice Files** (from microphone)
+   - Deleted 500ms after transcription completes
+   - Example: `recording_1699567890000.wav`
 
-### 2. **Signal-Slot Pattern**
-- Qt signals for communication between components
-- Loose coupling between widgets
-- Event-driven architecture
+### How It Works
 
-### 3. **Mixin Pattern**
-- `AudioHandlerMixin` adds audio functionality
-- Reusable across different window types
-- Clean method organization
-
-### 4. **Thread Management**
-- Background threads for all blocking operations
-- Proper cleanup on application exit
-- No UI freezing
-
-## File Size Comparison
-
-### Before Refactoring
+#### For Generated Speech:
 ```
-src/gui.py: 608 lines  ❌ Hard to navigate
+User Message → Agent Response → speak_tool creates audio 
+→ Audio plays → Playback ends → 200ms delay → File deleted ✓
 ```
 
-### After Refactoring
+#### For Voice Recordings:
 ```
-src/gui/__init__.py:        24 lines  ✓
-src/gui/threads.py:        133 lines  ✓
-src/gui/styles.py:          87 lines  ✓
-src/gui/chat_widget.py:    147 lines  ✓
-src/gui/settings_widget.py: 43 lines  ✓
-src/gui/audio_handler.py:  141 lines  ✓
-src/gui/main_window.py:    190 lines  ✓ (Could be split further if needed)
-────────────────────────────────────────
-Total:                     765 lines
+User records → File saved → Transcribed by agent → Response shown 
+→ 500ms delay → Recording deleted ✓
 ```
 
-**Result:** Increased total lines by ~26% BUT each file is now:
-- Easy to understand
-- Focused on one responsibility
-- Quick to locate and modify
+### Implementation
+```python
+def _cleanup_audio_file(self):
+    """Delete the current audio file after playback."""
+    if hasattr(self, 'current_audio_file') and self.current_audio_file:
+        audio_path = Path(self.current_audio_file)
+        if audio_path.exists():
+            time.sleep(0.1)  # Ensure file is released
+            audio_path.unlink()
+            print(f"✓ Cleaned up audio file: {audio_path.name}")
+```
 
-## Future Improvements
+---
 
-1. **Split `main_window.py` further**
-   - Extract event handlers to separate file
-   - Create UI builder class
+## 🔄 Interaction Flows
 
-2. **Add unit tests**
-   - Test each module independently
-   - Mock ZARVIS core for GUI tests
+### Text Command
+```
+1. User types message
+2. ZARVIS.process_text_command()
+3. Brain Agent processes
+4. Agent Node reasons
+5. Direct response (no tools)
+6. Response displayed
+```
 
-3. **Add type hints**
-   - Full type coverage
-   - Better IDE support
+### Voice Command
+```
+1. User clicks microphone
+2. AudioRecorder records
+3. Audio saved to output/
+4. ZARVIS.process_voice_command()
+5. Brain Agent receives prompt
+6. Agent uses listen_tool
+7. Tool Node transcribes
+8. Agent processes text
+9. Response generated
+10. Recording deleted ✓
+```
 
-4. **Plugin system**
-   - Custom widgets as plugins
-   - Extensible architecture
+### Image Analysis
+```
+1. User attaches image
+2. ZARVIS.analyze_image()
+3. Brain Agent receives prompt with URL
+4. Agent uses see_tool
+5. Tool Node analyzes image
+6. Agent synthesizes insights
+7. Analysis returned
+```
 
-## Usage
+### Voice Response
+```
+1. Agent generates text response
+2. Voice enabled check
+3. GUI triggers speak_tool
+4. Audio file created
+5. Media player plays
+6. Playback completes
+7. Audio file deleted ✓
+```
 
-### Running the GUI
+---
+
+## 🎯 Key Benefits of LangGraph Architecture
+
+### 1. **Intelligent Orchestration**
+- Agent automatically decides which tools to use
+- No manual routing logic needed
+- Dynamic tool selection based on context
+
+### 2. **Scalability**
+- Easy to add new tools (just use `@tool` decorator)
+- Tools are self-contained modules
+- Agent learns new capabilities automatically
+
+### 3. **Maintainability**
+- Clear separation of concerns
+- Tools are independently testable
+- Agent logic is centralized
+
+### 4. **Flexibility**
+- Support for complex workflows
+- Streaming responses
+- Conditional tool execution
+
+### 5. **Observability**
+- Full message history in state
+- Observable tool calls
+- Debug-friendly architecture
+
+### Console Output Example:
+```
+🧠 [Brain] Processing: Analyze this image...
+🔧 [Brain] Routing to tools: ['see_tool']
+👁️ [Eye Tool] Analyzed image, returned 250 characters
+✓ [Brain] Execution complete
+✓ Cleaned up audio file: speech_123456.wav
+```
+
+---
+
+## 📦 Dependencies
+
+### Core
+```txt
+groq==0.33.0                    # Groq API for LLM, Vision, TTS, STT
+python-dotenv==1.2.1            # Environment variables
+```
+
+### LangGraph & LangChain
+```txt
+langgraph==1.0.2                # Agent orchestration framework
+langchain-core==0.3.22          # Core abstractions
+langchain-groq==1.0.0           # Groq integration
+langchain==1.0.5                # Full library
+```
+
+### GUI
+```txt
+PyQt6==6.10.0                   # Desktop interface
+pillow==12.0.0                  # Image processing
+sounddevice==0.5.3              # Audio recording
+soundfile==0.13.1               # Audio file handling
+```
+
+---
+
+## 🚀 Usage Examples
+
+### 1. Basic Text Interaction
+```python
+from main import ZARVIS
+
+zarvis = ZARVIS()
+response = zarvis.process_text_command("Hello ZARVIS!")
+print(response)
+```
+
+### 2. Voice Command Processing
+```python
+zarvis = ZARVIS()
+response = zarvis.process_voice_command(
+    "recording.m4a",
+    generate_speech=True
+)
+print(response)
+```
+
+### 3. Image Analysis
+```python
+zarvis = ZARVIS()
+result = zarvis.analyze_image(
+    "https://example.com/image.jpg",
+    "What objects do you see?"
+)
+print(result)
+```
+
+### 4. Multimodal Interaction
+```python
+zarvis = ZARVIS()
+response = zarvis.multimodal_interaction(
+    text="Analyze both inputs",
+    audio="voice.m4a",
+    image="https://example.com/photo.jpg"
+)
+print(response)
+```
+
+### 5. Direct Agent Access
+```python
+from src.brain_agent import Brain
+
+brain = Brain()
+
+# Natural language - agent decides everything!
+response = brain.think(
+    "Listen to audio.m4a, analyze image.jpg, "
+    "and create a speech response"
+)
+print(response)
+```
+
+---
+
+## 🔧 Adding New Tools
+
+### Step 1: Create Tool
+```python
+# src/tools/my_tool.py
+from langchain_core.tools import tool
+
+@tool
+def my_new_tool(param: str) -> str:
+    """
+    Description of what this tool does.
+    The agent will read this to understand when to use it.
+    """
+    # Implementation
+    return result
+```
+
+### Step 2: Register in Brain
+```python
+# src/brain_agent.py
+from src.tools.my_tool import my_new_tool
+
+# In __init__:
+self.tools = [listen_tool, see_tool, speak_tool, my_new_tool]
+```
+
+### Step 3: Done!
+The agent will automatically learn to use your new tool based on its docstring!
+
+---
+
+## 🎓 Technical Details
+
+### LangGraph Flow
+```
+┌─────────────────────┐
+│   User Input        │
+└──────────┬──────────┘
+           │
+           ▼
+┌─────────────────────┐
+│   Agent Node        │
+│   (Reasoning)       │
+└──────────┬──────────┘
+           │
+           ▼
+    ┌──────────────┐
+    │  Tool Call?  │
+    └──────┬───────┘
+           │
+    ┌──────┴──────┐
+    │             │
+   Yes           No
+    │             │
+    ▼             ▼
+┌─────────┐   ┌─────────┐
+│  Tools  │   │  END    │
+│  Node   │   └─────────┘
+└────┬────┘
+     │
+     ▼
+┌─────────────┐
+│ Agent Node  │
+│ (Synthesis) │
+└──────┬──────┘
+       │
+       ▼
+   ┌─────────┐
+   │  END    │
+   └─────────┘
+```
+
+### Message Types
+- `HumanMessage` - User input
+- `AIMessage` - Agent responses
+- `SystemMessage` - System prompts
+- `ToolMessage` - Tool execution results
+
+### State Management
+```python
+class AgentState(TypedDict):
+    messages: Annotated[Sequence[BaseMessage], add_messages]
+    next: Optional[str]
+```
+
+---
+
+## 📊 Performance Characteristics
+
+### Latency
+- **LLM Response:** ~1-2 seconds (Groq optimized)
+- **Speech-to-Text:** ~0.5-1 second
+- **Text-to-Speech:** ~1-2 seconds
+- **Vision Analysis:** ~1-2 seconds
+
+### Resource Usage
+- **Memory:** ~200-500 MB (depending on GUI)
+- **CPU:** Minimal (API-based processing)
+- **Disk:** Auto-cleanup keeps it minimal
+- **Network:** Requires internet for Groq API
+
+---
+
+## 🔒 Security & Privacy
+
+### API Key Management
+- Stored in `.env` file (not committed to git)
+- Loaded via `python-dotenv`
+- Never exposed in logs
+
+### File Cleanup
+- Automatic deletion of temporary audio files
+- No persistent storage of voice recordings
+- Output directory kept clean
+
+### Tool Safety
+- Tools have clear permissions and descriptions
+- Agent can only use registered tools
+- No arbitrary code execution
+
+---
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+1. **Import Errors**
 ```bash
-python -m gui_main
+pip install --upgrade langgraph langchain-core langchain-groq
 ```
 
-### Importing modules
-```python
-from src.gui import launch_gui
-from src.gui.chat_widget import ChatWidget
-from src.gui.threads import ProcessingThread
+2. **API Key Missing**
+```bash
+# Check .env file
+GROQ_API_KEY=your_key_here
 ```
 
-### Extending the GUI
-```python
-# Add new widget
-from PyQt6.QtWidgets import QWidget
-from src.gui.styles import DarkTheme
+3. **Audio Playback Issues**
+- Check file permissions in `output/` directory
+- Ensure media player has access to files
+- Check console for cleanup logs
 
-class CustomWidget(QWidget):
-    def __init__(self):
-        super().__init__()
-        self.setStyleSheet(DarkTheme.STYLESHEET)
-```
+4. **Tool Not Being Called**
+- Check tool is registered in `brain_agent.py`
+- Verify tool docstring is clear
+- Check console for routing decisions
 
-## Conclusion
+---
 
-The refactored structure makes ZARVIS more professional, maintainable, and scalable while keeping individual files concise and focused.
+## 📚 Documentation Files
+
+| File | Purpose |
+|------|---------|
+| `ARCHITECTURE.md` | This file - Complete system architecture |
+| `ARCHITECTURE_LANGGRAPH.md` | Detailed LangGraph implementation guide |
+| `MIGRATION.md` | Migration guide from old architecture |
+| `SUMMARY.md` | Project statistics and overview |
+| `AUDIO_CLEANUP.md` | Audio cleanup feature documentation |
+| `README.md` | Quick start and project overview |
+
+---
+
+## 🔮 Future Enhancements
+
+### Planned Features
+
+1. **Persistent Memory**
+   - Conversation history across sessions
+   - User preferences and context
+   - Checkpointing for long conversations
+
+2. **Advanced Tool Composition**
+   - Sequential tool chains
+   - Parallel tool execution
+   - Tool result aggregation
+
+3. **Custom Nodes**
+   - Decision-making nodes
+   - Validation nodes
+   - Post-processing nodes
+
+4. **Enhanced Error Handling**
+   - Retry logic for failed tools
+   - Fallback strategies
+   - Graceful degradation
+
+5. **Performance Optimization**
+   - Caching tool results
+   - Lazy tool loading
+   - Batch processing
+
+---
+
+## 📝 Version History
+
+### v2.0.0 - LangGraph Refactoring (Current)
+- ✅ Migrated to LangGraph architecture
+- ✅ Brain as agent orchestrator
+- ✅ Ear, Eye, Mouth as tools
+- ✅ Intelligent tool selection
+- ✅ Automatic audio cleanup
+- ✅ Comprehensive documentation
+
+### v1.0.0 - Original Architecture
+- Basic module structure
+- Direct function calls
+- Manual orchestration
+- Manual file management
+
+---
+
+## 🤝 Contributing
+
+When adding new features:
+1. Create tools with `@tool` decorator
+2. Add clear docstrings (agent reads these!)
+3. Test tools independently
+4. Update documentation
+5. Submit PR with examples
+
+---
+
+## 📞 Support
+
+For questions or issues:
+1. Check this documentation
+2. Review `ARCHITECTURE_LANGGRAPH.md` for implementation details
+3. Check `MIGRATION.md` for usage examples
+4. Look at console logs for debugging
+
+---
+
+**ZARVIS v2.0 - Zero-Latency Autonomous Runtime Virtual Intelligence System**
+
+**Built with ❤️ using LangGraph, LangChain, and Groq**
