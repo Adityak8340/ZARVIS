@@ -40,6 +40,7 @@ class ZARVISMainWindow(AudioHandlerMixin, QMainWindow):
         # State
         self.voice_enabled = True
         self.is_recording = False
+        self.current_audio_file: Optional[str] = None  # Track current audio for cleanup
         
         # Audio player
         self.audio_output = QAudioOutput()

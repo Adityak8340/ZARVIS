@@ -42,6 +42,7 @@ class AudioHandlerMixin:
     speech_thread: Optional[ProcessingThread]
     is_recording: bool
     voice_enabled: bool
+    current_audio_file: Optional[str]  # Track current audio file for cleanup
     
     # Methods that must exist in parent class
     def _on_error(self, error: str) -> None:
@@ -106,9 +107,30 @@ class AudioHandlerMixin:
         self.processing_thread = ProcessingThread(
             self.zarvis, "voice", audio_file=audio_file
         )
-        self.processing_thread.finished.connect(self._on_response)
+        self.processing_thread.finished.connect(lambda response: self._on_voice_response(response, audio_file))
         self.processing_thread.error.connect(self._on_error)
         self.processing_thread.start()
+    
+    def _on_voice_response(self, response: str, audio_file: str):
+        """Handle voice command response and cleanup recording."""
+        self._on_response(response)
+        
+        # Clean up the recorded audio file after processing
+        try:
+            recorded_path = Path(audio_file)
+            if recorded_path.exists():
+                QTimer.singleShot(500, lambda: self._delete_file(recorded_path))
+        except Exception as e:
+            print(f"⚠ Could not cleanup recorded file: {e}")
+    
+    def _delete_file(self, file_path: Path):
+        """Helper to delete a file."""
+        try:
+            if file_path.exists():
+                file_path.unlink()
+                print(f"✓ Cleaned up recording: {file_path.name}")
+        except Exception as e:
+            print(f"⚠ Could not delete file: {e}")
     
     def _speak_text(self, text: str):
         """Generate and play speech from text."""
@@ -142,9 +164,13 @@ class AudioHandlerMixin:
             print(f"Playing audio: {audio_file.absolute()}")
             print(f"File size: {audio_file.stat().st_size} bytes")
             
-            # Stop current playback
+            # Stop current playback and cleanup previous audio
             if self.media_player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
                 self.media_player.stop()
+                self._cleanup_audio_file()
+            
+            # Store current audio file path for cleanup after playback
+            self.current_audio_file = str(audio_file.absolute())
             
             # Play audio
             file_url = QUrl.fromLocalFile(str(audio_file.absolute()))
@@ -173,6 +199,22 @@ class AudioHandlerMixin:
         )
         self.status_bar.showMessage("Ready")
     
+    def _cleanup_audio_file(self):
+        """Delete the current audio file after playback."""
+        if hasattr(self, 'current_audio_file') and self.current_audio_file:
+            try:
+                audio_path = Path(self.current_audio_file)
+                if audio_path.exists():
+                    # Small delay to ensure file is released by media player
+                    import time
+                    time.sleep(0.1)
+                    audio_path.unlink()
+                    print(f"✓ Cleaned up audio file: {audio_path.name}")
+            except Exception as e:
+                print(f"⚠ Could not delete audio file: {e}")
+            finally:
+                self.current_audio_file = None
+    
     def _on_playback_state_changed(self, state):
         """Handle playback state changes."""
         if state == QMediaPlayer.PlaybackState.StoppedState:
@@ -181,3 +223,6 @@ class AudioHandlerMixin:
                 "[✓ Voice response finished]",
                 DarkTheme.SYSTEM_MESSAGE
             )
+            
+            # Clean up audio file after playback
+            QTimer.singleShot(200, self._cleanup_audio_file)  # Delay to ensure media player releases file

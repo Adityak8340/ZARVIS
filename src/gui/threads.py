@@ -55,8 +55,11 @@ class ProcessingThread(QThread):
                 self.finished.emit(result)
             
             elif self.task_type == "speak":
-                audio_path = self.zarvis.mouth.speak(
-                    self.kwargs.get("text", "")
+                # Use the tool directly for faster speech generation in GUI
+                from src.tools.mouth_tool import text_to_speech
+                audio_path = text_to_speech(
+                    self.kwargs.get("text", ""),
+                    output_filename=f"speech_{id(self)}.wav"
                 )
                 self.audio_ready.emit(str(audio_path))
             
